@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+*.env
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Database
+instagram.db
+
+# Machine Learning Models
+likes_predictor.joblib
+label_encoder_day.joblib
+
+# IDE and OS files
+.idea/
+*.DS_Store
