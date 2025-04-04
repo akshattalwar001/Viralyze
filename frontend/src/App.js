@@ -5,43 +5,70 @@ import './App.css';
 
 function App() {
   const [stats, setStats] = useState([]);
-  const [bestTime, setBestTime] = useState(''); // Correct: setBestTime for bestTime
-  const [bestDay, setBestDay] = useState('');   // Correct: setBestDay for bestDay
+  const [bestTime, setBestTime] = useState('');
+  const [bestDay, setBestDay] = useState('');
   const [topPost, setTopPost] = useState(null);
   const [engagementTrend, setEngagementTrend] = useState([]);
   const [predictedLikes, setPredictedLikes] = useState(null);
   const [predictHour, setPredictHour] = useState('');
   const [predictDay, setPredictDay] = useState('');
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchStats();
   }, []);
 
   const fetchStats = async () => {
+    setLoading(true);
     try {
       const response = await axios.get('http://localhost:5000/api/stats');
-      setStats(response.data.stats);
-      setBestTime(response.data.bestTime);
-      setBestDay(response.data.bestDay); // Correct: Use setBestDay
-      setTopPost(response.data.topPost);
-      setEngagementTrend(response.data.engagementTrend);
+      setStats(response.data.stats || []);
+      setBestTime(response.data.bestTime || '');
+      setBestDay(response.data.bestDay || '');
+      setTopPost(response.data.topPost || null);
+      setEngagementTrend(response.data.engagementTrend || []);
+      setError(null);
     } catch (error) {
       console.error('Error fetching stats:', error);
+      setError('Failed to fetch stats. Please ensure the backend is running.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const predictLikes = async () => {
+    if (!predictHour || !predictDay) {
+      setError('Please fill in all fields.');
+      return;
+    }
+
+    setLoading(true);
     try {
       const response = await axios.post('http://localhost:5000/api/predict', {
         hour: predictHour,
         day: predictDay
       });
       setPredictedLikes(response.data.predictedLikes);
+      setError(null);
     } catch (error) {
       console.error('Error predicting likes:', error);
       setPredictedLikes(null);
+      setError('Failed to predict likes. Please check your inputs and ensure the backend is running.');
+    } finally {
+      setLoading(false);
     }
   };
+
+  if (error) {
+    return (
+      <div className="App">
+        <h1>Instagram AI Manager</h1>
+        <p style={{ color: 'red' }}>{error}</p>
+        <button onClick={fetchStats}>Retry</button>
+      </div>
+    );
+  }
 
   return (
     <div className="App">
@@ -49,6 +76,7 @@ function App() {
       <button onClick={fetchStats}>Refresh Data</button>
       <div>
         <h3>Predict Likes for a Future Post</h3>
+        {loading && <p>Loading...</p>}
         <label>
           Hour (0-23):
           <input

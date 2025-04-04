@@ -1,22 +1,59 @@
 .App {
-  text-align: center;
+  font-family: Arial, sans-serif;
+  max-width: 800px;
+  margin: 0 auto;
   padding: 20px;
+  text-align: center;
 }
-button {
-  padding: 10px 20px;
-  margin: 10px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  cursor: pointer;
+
+h1 {
+  color: #333;
 }
-button:hover {
-  background-color: #0056b3;
+
+h3 {
+  color: #555;
 }
+
 label {
-  margin: 0 10px;
+  display: block;
+  margin: 10px 0;
 }
+
 input, select {
-  margin: 0 5px;
-  padding: 5px;
+  padding: 8px;
+  margin-left: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+button {
+  background-color: #ff6200; /* Swiggy's brand color */
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin: 10px;
+}
+
+button:hover {
+  background-color: #e55a00;
+}
+
+.dashboard {
+  margin-top: 20px;
+  text-align: left;
+}
+
+.stats, .best-time, .best-day, .top-post, .engagement-trend {
+  margin-bottom: 20px;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  margin: 5px 0;
 }

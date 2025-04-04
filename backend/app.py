@@ -1,167 +1,161 @@
+import json
+import pandas as pd
+from datetime import datetime
+import numpy as np
+import joblib
+from pathlib import Path
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import sqlite3
-from datetime import datetime
-import os
-from dotenv import load_dotenv
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import LabelEncoder
-import joblib
-import numpy as np
-import json
 
 app = Flask(__name__)
-CORS(app)
-load_dotenv()
+CORS(app)  # Enable CORS to allow requests from the React frontend
 
-# Load sample data from JSON file
-def load_sample_data():
-    with open('data/sample_posts.json', 'r') as file:
-        return json.load(file)
+# Load the pre-trained model and feature names
+try:
+    model_data = joblib.load('swiggy_likes_predictor.joblib')
+    model = model_data['model']
+    feature_names = model_data['feature_names']
+except FileNotFoundError:
+    print("Error: 'swiggy_likes_predictor.joblib' not found. Please train the model first.")
+    model, feature_names = None, None
 
-# Initialize the database
-def init_db():
-    conn = sqlite3.connect('instagram.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS posts
-                 (post_id TEXT, likes INTEGER, comments INTEGER, shares INTEGER, timestamp TEXT)''')
-    conn.commit()
-    conn.close()
+# Load the JSON dataset with error handling
+def load_data(filename='swiggyindia_all_posts.json'):
+    try:
+        with open(filename, 'r', encoding='utf-8') as file:
+            data = json.load(file)
+        return data
+    except FileNotFoundError:
+        print(f"Error: The file '{filename}' was not found. Please ensure it is in the same directory as this script.")
+        print(f"Current directory: {Path.cwd()}")
+        return []
 
-# Load or train the ML model
-MODEL_PATH = 'likes_predictor.joblib'
-LABEL_ENCODER_PATH = 'label_encoder_day.joblib'
+# Extract features from the dataset (for stats calculation)
+def extract_features(data):
+    if not data:
+        return pd.DataFrame()
+    features = []
+    for i, post in enumerate(data):
+        dt = datetime.fromisoformat(post['timestamp'].replace('Z', '+00:00'))
 
-def train_or_load_model(posts):
-    # Initialize label_encoder_day
-    label_encoder_day = LabelEncoder()
+        # Basic features
+        hour = dt.hour
+        day_of_week = dt.strftime('%A')
+        is_peak_hour = 1 if 12 <= hour <= 18 else 0
+        is_weekday = 1 if dt.weekday() < 5 else 0
 
-    # Define all days of the week to ensure the encoder knows them
-    all_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        # Calculate days since the first post (for stats, not prediction)
+        first_post_dt = datetime.fromisoformat(data[0]['timestamp'].replace('Z', '+00:00'))
+        days_since_first_post = (first_post_dt - dt).days
 
-    if os.path.exists(MODEL_PATH) and os.path.exists(LABEL_ENCODER_PATH):
-        # Load the existing model and label encoder
-        model = joblib.load(MODEL_PATH)
-        label_encoder_day = joblib.load(LABEL_ENCODER_PATH)
-    else:
-        # Prepare the data for training
-        X = []
-        y = []
+        # Calculate average likes of the last 5 posts (for stats, not prediction)
+        avg_likes_last_5 = 0
+        if i >= 5:
+            prev_likes = [data[j]['likes_count'] for j in range(i - 5, i)]
+            avg_likes_last_5 = np.mean(prev_likes)
 
-        for post in posts:
-            dt = datetime.fromisoformat(post['timestamp'].replace('Z', '+00:00'))
-            hour = dt.hour
-            day = dt.strftime('%A')
-            X.append([hour, day])
-            y.append(post['likes_count'])
+        # Store features and target
+        features.append({
+            'hour': hour,
+            'day_of_week': day_of_week,
+            'is_peak_hour': is_peak_hour,
+            'is_weekday': is_weekday,
+            'days_since_first_post': days_since_first_post,
+            'avg_likes_last_5': avg_likes_last_5,
+            'likes_count': post['likes_count'],
+            'post_id': post['id'],
+            'timestamp': post['timestamp']
+        })
 
-        # Encode the day of the week
-        days = [x[1] for x in X]
-        # Fit the encoder on all days to avoid unseen labels
-        label_encoder_day.fit(all_days)
-        encoded_days = label_encoder_day.transform(days)
-        X = [[x[0], encoded_days[i]] for i, x in enumerate(X)]
+    return pd.DataFrame(features)
 
-        # Train a linear regression model
-        model = LinearRegression()
-        model.fit(X, y)
+# Make a prediction for a new post (using only hour and day_of_week)
+def predict_likes(model, feature_names, hour, day_of_week):
+    if model is None:
+        return "Model not trained. Please check the data file."
+    # Create a DataFrame with the input features
+    input_data = pd.DataFrame({
+        'hour': [hour],
+        'is_peak_hour': [1 if 12 <= hour <= 18 else 0],
+        'is_weekday': [1 if datetime.strptime(day_of_week, '%A').weekday() < 5 else 0]
+    })
 
-        # Save the model and label encoder
-        joblib.dump(model, MODEL_PATH)
-        joblib.dump(label_encoder_day, LABEL_ENCODER_PATH)
+    # Add one-hot encoded day_of_week columns (excluding the first day as reference)
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    for day in days[1:]:
+        input_data[f'day_of_week_{day}'] = [1 if day == day_of_week else 0]
 
-    return model, label_encoder_day
+    # Ensure all columns match the training set
+    for col in feature_names:
+        if col not in input_data.columns:
+            input_data[col] = 0
 
+    # Reorder columns to match training set
+    input_data = input_data[feature_names]
+
+    # Predict
+    prediction = model.predict(input_data)[0]
+    return max(0, int(prediction))  # Ensure non-negative integer
+
+# API endpoint for stats
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
-    try:
-        # Load sample data
-        posts = load_sample_data()
+    data = load_data()
+    if not data:
+        return jsonify({'error': 'Data not found'}), 404
 
-        # Save to SQLite
-        conn = sqlite3.connect('instagram.db')
-        c = conn.cursor()
-        for post in posts:
-            c.execute('INSERT OR IGNORE INTO posts VALUES (?, ?, ?, ?, ?)',
-                      (post['id'], post['likes_count'], post['comments_count'], 0, post['timestamp']))
-        conn.commit()
-        conn.close()
+    df = extract_features(data)
 
-        # AI: Best posting hour
-        hourly_likes = {}
-        for post in posts:
-            hour = datetime.fromisoformat(post['timestamp'].replace('Z', '+00:00')).hour
-            hourly_likes[hour] = hourly_likes.get(hour, 0) + post['likes_count']
-        best_hour = max(hourly_likes, key=hourly_likes.get)
+    # Calculate stats as an array of objects
+    stats = [
+        {'name': 'Total Posts', 'value': len(df)},
+        {'name': 'Average Likes', 'value': int(df['likes_count'].mean())},
+        {'name': 'Average Comments', 'value': int(sum([post['comments_count'] for post in data]) / len(data))}
+    ]
 
-        # AI: Best day of the week
-        daily_likes = {}
-        for post in posts:
-            day = datetime.fromisoformat(post['timestamp'].replace('Z', '+00:00')).strftime('%A')
-            daily_likes[day] = daily_likes.get(day, 0) + post['likes_count']
-        best_day = max(daily_likes, key=daily_likes.get)
+    # Best time to post (hour with highest average likes)
+    best_time = df.groupby('hour')['likes_count'].mean().idxmax()
 
-        # AI: Engagement rate per post
-        engagement_rates = []
-        for post in posts:
-            total_engagement = post['likes_count'] + post['comments_count']
-            engagement_rates.append({
-                'post_id': post['id'],
-                'engagement': total_engagement,
-                'timestamp': post['timestamp']
-            })
-        top_post = max(engagement_rates, key=lambda x: x['engagement'])
+    # Best day to post (day with highest average likes)
+    best_day = df.groupby('day_of_week')['likes_count'].mean().idxmax()
 
-        # AI: Engagement trend
-        posts_sorted = sorted(posts, key=lambda x: x['timestamp'])
-        engagement_trend = []
-        for i in range(1, len(posts_sorted)):
-            prev_engagement = posts_sorted[i-1]['likes_count'] + posts_sorted[i-1]['comments_count']
-            curr_engagement = posts_sorted[i]['likes_count'] + posts_sorted[i]['comments_count']
-            trend = 'up' if curr_engagement > prev_engagement else 'down'
-            engagement_trend.append({
-                'from': posts_sorted[i-1]['timestamp'],
-                'to': posts_sorted[i]['timestamp'],
-                'trend': trend,
-                'change': curr_engagement - prev_engagement
-            })
+    # Top post (post with the most likes)
+    top_post_idx = df['likes_count'].idxmax()
+    top_post = {
+        'id': df.loc[top_post_idx, 'post_id'],
+        'likes': int(df.loc[top_post_idx, 'likes_count']),
+        'timestamp': df.loc[top_post_idx, 'timestamp']
+    }
 
-        return jsonify({
-            'stats': posts,
-            'bestTime': f'{best_hour}:00',
-            'bestDay': best_day,
-            'topPost': top_post,
-            'engagementTrend': engagement_trend
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    # Engagement trend (likes over time)
+    engagement_trend = df.groupby('timestamp')['likes_count'].mean().reset_index().to_dict('records')
 
+    return jsonify({
+        'stats': stats,
+        'bestTime': int(best_time),
+        'bestDay': best_day,
+        'topPost': top_post,
+        'engagementTrend': engagement_trend
+    })
+
+# API endpoint for prediction (using only hour and day)
 @app.route('/api/predict', methods=['POST'])
-def predict_likes():
+def predict():
     try:
+        # Get input from the request
         data = request.get_json()
         hour = int(data['hour'])
-        day = data['day']
+        day_of_week = data['day']
 
-        # Load the model and label encoder
-        model = joblib.load(MODEL_PATH)
-        label_encoder_day = joblib.load(LABEL_ENCODER_PATH)
+        # Validate inputs
+        if not (0 <= hour <= 23):
+            return jsonify({'error': 'Hour must be between 0 and 23'}), 400
 
-        # Prepare the input for prediction
-        encoded_day = label_encoder_day.transform([day])[0]
-        X_pred = [[hour, encoded_day]]
-
-        # Make the prediction
-        predicted_likes = model.predict(X_pred)[0]
-        predicted_likes = max(0, int(predicted_likes))  # Ensure non-negative integer
-
+        # Make prediction
+        predicted_likes = predict_likes(model, feature_names, hour, day_of_week)
         return jsonify({'predictedLikes': predicted_likes})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)}), 400
 
 if __name__ == '__main__':
-    # Load sample data and train or load the model at startup
-    sample_posts = load_sample_data()
-    train_or_load_model(sample_posts)
-    init_db()
-    app.run(port=int(os.getenv('FLASK_PORT', 5000)), debug=True)
+    app.run(debug=True, port=5000)

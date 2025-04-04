@@ -1,48 +1,59 @@
 import React from 'react';
-import { Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
-
-const Dashboard = ({ stats, bestTime }) => {
-  const hourlyLikes = {};
-  stats.forEach(post => {
-    const hour = new Date(post.timestamp).getHours();
-    hourlyLikes[hour] = (hourlyLikes[hour] || 0) + post.likes_count;
-  });
-
-  const chartData = {
-    labels: Object.keys(hourlyLikes).map(h => `${h}:00`),
-    datasets: [
-      {
-        label: 'Likes by Hour',
-        data: Object.values(hourlyLikes),
-        backgroundColor: 'rgba(75, 192, 192, 0.6)',
-      },
-    ],
-  };
-
-  const options = {
-    responsive: true,
-    plugins: { legend: { position: 'top' }, title: { display: true, text: 'Engagement by Hour' } },
-  };
-
+function Dashboard({ stats = [], bestTime = '', bestDay = '', topPost = null, engagementTrend = [] }) {
   return (
-    <div>
-      <h2>Best Posting Time: {bestTime || 'Loading...'}</h2>
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <Bar data={chartData} options={options} />
+    <div className="dashboard">
+      <h2>Dashboard</h2>
+      <div className="stats">
+        <h3>Stats</h3>
+        {stats.length > 0 ? (
+          <ul>
+            {stats.map((stat, index) => (
+              <li key={index}>
+                {stat.name}: {stat.value}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No stats available.</p>
+        )}
       </div>
-      <h3>Recent Posts</h3>
-      <ul>
-        {stats.map(post => (
-          <li key={post.id}>
-            {new Date(post.timestamp).toLocaleString()} - Likes: {post.likes_count}, Comments: {post.comments_count}
-          </li>
-        ))}
-      </ul>
+      <div className="best-time">
+        <h3>Best Time to Post</h3>
+        <p>Hour: {bestTime || 'N/A'}</p>
+      </div>
+      <div className="best-day">
+        <h3>Best Day to Post</h3>
+        <p>Day: {bestDay || 'N/A'}</p>
+      </div>
+      <div className="top-post">
+        <h3>Top Post</h3>
+        {topPost ? (
+          <div>
+            <p>Post ID: {topPost.id}</p>
+            <p>Likes: {topPost.likes}</p>
+            <p>Timestamp: {topPost.timestamp}</p>
+          </div>
+        ) : (
+          <p>No top post available.</p>
+        )}
+      </div>
+      <div className="engagement-trend">
+        <h3>Engagement Trend</h3>
+        {engagementTrend.length > 0 ? (
+          <ul>
+            {engagementTrend.map((trend, index) => (
+              <li key={index}>
+                {trend.timestamp}: {trend.likes_count} likes
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No engagement trend available.</p>
+        )}
+      </div>
     </div>
   );
-};
+}
 
 export default Dashboard;
