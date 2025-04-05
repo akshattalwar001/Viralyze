@@ -1,5 +1,8 @@
-from firebase_database import create_user, UserData
-from aws_s3_storage import upload_to_s3
+from firebase_database import  UserData
+# from aws_s3_storage import upload_to_s3
+from aws_s3_storage import upload_model_to_s3
+# import json
+
 user_data = UserData(
     username="elonmusk",
     full_name="Elon Musk",
@@ -21,6 +24,8 @@ user_data = UserData(
     avg_comments=12_300
 )
 
-# create_user(user_data)
-upload_to_s3("swiggyindia",file_type='profile')
-upload_to_s3("swiggyindia",file_type='posts')
+# # create_user(user_data)
+# upload_to_s3("swiggyindia",file_type='profile')
+# upload_to_s3("swiggyindia",file_type='posts')
+
+upload_model_to_s3("likes_predictor")

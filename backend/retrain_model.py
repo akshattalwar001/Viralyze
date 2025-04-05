@@ -2,14 +2,11 @@ import json
 import pandas as pd
 from datetime import datetime
 import xgboost as xgb
-import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
 import joblib
 from pathlib import Path
-
-
-LOCAL_DATA_DIR = Path("data/model")
+from config import LOCAL_MODEL_DIR
 
 
 # Load the JSON dataset with error handling
@@ -92,7 +89,7 @@ def train_model(X, y):
 def main():
     try:
         # Load and prepare data
-        data = load_data()
+        data = load_data('swiggyindia_posts.json')
         df = extract_features(data)
         X, y = prepare_data(df)
 
@@ -101,7 +98,7 @@ def main():
 
         if model:
             # Save the model and feature names (no scaler needed since we removed days_since_first_post)
-            model_path = LOCAL_DATA_DIR / 'swiggy_likes_predictor.joblib'
+            model_path = LOCAL_MODEL_DIR / 'likes_predictor.joblib'
             joblib.dump({'model': model, 'feature_names': feature_names}, model_path)
             print(f"Model saved to {model_path}")
     except KeyboardInterrupt:

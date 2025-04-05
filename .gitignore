@@ -29,4 +29,3 @@ label_encoder_day.joblib
 # custom files
 serviceAccountKey.json
 data/
-*.json

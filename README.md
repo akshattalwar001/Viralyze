@@ -4,14 +4,14 @@
 - [x] Create AWS S3 store
 - [x] Check AWS S3 store
 - [ ] Finish AWS S3 store
-- [ ] Create API
-- [ ] Check API
+- [x] Create API
+- [x] Check API
 - [ ] Finish API
 - [ ] Create API routes
 - [ ] Check API routes
 - [ ] Finish API routes
-- [ ] Create folder structure
-- [ ] Check folder structure
+- [x] Create folder structure
+- [x] Check folder structure
 - [ ] Finish folder structure
 - [ ] Create scraping
 - [ ] Check scraping
