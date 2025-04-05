@@ -8,11 +8,18 @@ from sklearn.metrics import mean_absolute_error
 import joblib
 from pathlib import Path
 
+
+LOCAL_DATA_DIR = Path("data/model")
+
+
 # Load the JSON dataset with error handling
 def load_data(filename='swiggyindia_all_posts.json'):
     try:
         with open(filename, 'r', encoding='utf-8') as file:
             data = json.load(file)
+            print(f"Loaded {len(data)} posts from {filename}.")
+        # Check if the data is empty
+        
         return data
     except FileNotFoundError:
         print(f"Error: The file '{filename}' was not found. Please ensure it is in the same directory as this script.")
@@ -83,19 +90,22 @@ def train_model(X, y):
 
 # Main execution
 def main():
-    # Load and prepare data
-    data = load_data()
-    df = extract_features(data)
-    X, y = prepare_data(df)
+    try:
+        # Load and prepare data
+        data = load_data()
+        df = extract_features(data)
+        X, y = prepare_data(df)
 
-    # Train the model
-    model, feature_names = train_model(X, y)
+        # Train the model
+        model, feature_names = train_model(X, y)
 
-    if model:
-        # Save the model and feature names (no scaler needed since we removed days_since_first_post)
-        model_path = Path('swiggy_likes_predictor.joblib')
-        joblib.dump({'model': model, 'feature_names': feature_names}, model_path)
-        print(f"Model saved to {model_path}")
+        if model:
+            # Save the model and feature names (no scaler needed since we removed days_since_first_post)
+            model_path = LOCAL_DATA_DIR / 'swiggy_likes_predictor.joblib'
+            joblib.dump({'model': model, 'feature_names': feature_names}, model_path)
+            print(f"Model saved to {model_path}")
+    except KeyboardInterrupt:
+        print("\nProcess interrupted by user. Exiting...")
 
 if __name__ == "__main__":
     main()

@@ -7,6 +7,7 @@ __pycache__/
 env/
 venv/
 *.env
+.venv
 
 # Node.js
 node_modules/
@@ -19,7 +20,13 @@ instagram.db
 # Machine Learning Models
 likes_predictor.joblib
 label_encoder_day.joblib
+*.joblib
 
 # IDE and OS files
 .idea/
 *.DS_Store
+
+# custom files
+serviceAccountKey.json
+data/
+*.json

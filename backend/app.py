@@ -6,13 +6,17 @@ import joblib
 from pathlib import Path
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from pathlib import Path
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS to allow requests from the React frontend
+LOCAL_DATA_DIR = Path("data/model")
 
 # Load the pre-trained model and feature names
 try:
-    model_data = joblib.load('swiggy_likes_predictor.joblib')
+    # Check if the model and feature names are loaded correctly
+    model_data_path = LOCAL_DATA_DIR / 'swiggy_likes_predictor.joblib'
+    model_data = joblib.load(model_data_path)
     model = model_data['model']
     feature_names = model_data['feature_names']
 except FileNotFoundError:
