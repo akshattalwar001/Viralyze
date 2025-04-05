@@ -19,8 +19,8 @@ class Colors:
 
 USER_AGENTS = [
     "Instagram 123.0.0.0 Android",
-    "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Mobile Safari/537.36",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
+    # "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Mobile Safari/537.36",
+    # "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
 ]
 
 CACHE_FILE = "data/fetch_cache.json"
@@ -37,16 +37,17 @@ def save_cache(cache):
     with open(CACHE_FILE, "w") as file:
         json.dump(cache, file, indent=4)
 
-def fetch_all_posts(username):
+def scrape_user_data(username, max_posts=12):
     """Fetch all posts for a given username using Instagram's API with pagination, delays, retries, and caching."""
     base_url = "https://i.instagram.com/api/v1/users/web_profile_info/"
     all_posts = []
     batch_count = 0
-    batch_size = 500
-    folder_path = os.path.join('data',username)
+    batch_size = 1  # Number of posts to save in each batch
+    folder_path = os.path.join('data','profiles',username)
 
     # Create folder for the username if it doesn't exist
     os.makedirs(folder_path, exist_ok=True)
+    print(f"{Colors.HEADER}🚀 Fetching posts for {username}...{Colors.ENDC}")
 
     # Load cache
     cache = load_cache()
@@ -68,6 +69,7 @@ def fetch_all_posts(username):
             if response.status_code == 200:
                 print(f"{Colors.OKGREEN}✅ Successfully fetched data for {username}.{Colors.ENDC}")
                 data = response.json()
+                # TODO: Check if the response contains the expected data structure
                 user_data = data["data"]["user"]
                 media = user_data["edge_owner_to_timeline_media"]
 
@@ -75,15 +77,24 @@ def fetch_all_posts(username):
                 has_next_page = media["page_info"]["has_next_page"]
                 end_cursor = media["page_info"]["end_cursor"]
 
-                # Save posts in batches of 500
+                # Save posts in batches of 60
                 if len(all_posts) >= batch_size:
                     batch_count += 1
-                    save_to_file(all_posts[:batch_size], os.path.join(folder_path, f"batch_{batch_count}.json"))
+                    save_to_file(user_data, os.path.join(folder_path, "profile.json"))
                     all_posts = all_posts[batch_size:]
 
                 # Update cache
-                cache[username] = {"end_cursor": end_cursor, "has_next_page": has_next_page}
+                cache[username] = {
+                    "end_cursor": end_cursor,
+                    "has_next_page": has_next_page,
+                    "last_scraped": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
                 save_cache(cache)
+
+                # Check if max_posts limit is reached
+                if max_posts and len(all_posts) >= max_posts:
+                    print(f"{Colors.OKBLUE}📌 Reached the specified limit of {max_posts} posts. Stopping...{Colors.ENDC}")
+                    has_next_page = False
 
                 # Reset retry attempts and add a random delay to avoid IP blocking
                 retry_attempts = 0
@@ -109,16 +120,18 @@ def fetch_all_posts(username):
             break
 
     # Save any remaining posts
-    if all_posts:
-        batch_count += 1
-        save_to_file(all_posts, os.path.join(folder_path, f"batch_{batch_count}.json"))
+    # if all_posts:
+    #     batch_count += 1
+    #     save_to_file(all_posts, os.path.join(folder_path, f"posts_{batch_count}.json"))
 
-    print(f"{Colors.OKBLUE}📁 All posts saved in folder: {folder_path}{Colors.ENDC}")
+    print(f"{Colors.OKBLUE}📁 All {len(all_posts)} posts saved in folder: {folder_path}{Colors.ENDC}")
+    return all_posts
 
-def process_posts(posts):
+def store_posts_into_json(posts, username):
     """Process posts to extract relevant fields."""
     formatted_posts = []
-
+    print(f"{Colors.OKCYAN}📦 Processing posts...{Colors.ENDC}")
+    
     for post in posts:
         node = post["node"]
         pid = node["id"]
@@ -127,6 +140,7 @@ def process_posts(posts):
         caption = node["edge_media_to_caption"]["edges"][0]["node"]["text"] if node["edge_media_to_caption"]["edges"] else ""
         comments = node["edge_media_to_comment"]["count"]
         likes = node["edge_liked_by"]["count"]
+        views = node["video_view_count"] if "video_view_count" in node else 0
         hashtags = [word for word in caption.split() if word.startswith("#")]
 
         formatted_post = {
@@ -139,8 +153,11 @@ def process_posts(posts):
             "hashtags": hashtags
         }
         formatted_posts.append(formatted_post)
+    
+    # Save the entire list of formatted posts
+    save_to_file(formatted_posts, os.path.join('data', 'profiles', username, 'posts.json'))
 
-    return formatted_posts
+    return True if formatted_posts else False
 
 def save_to_file(data, filename):
     """Save data to a JSON file."""
@@ -150,8 +167,8 @@ def save_to_file(data, filename):
 
 def main():
     username = "rvcjinsta"
-    print(f"{Colors.HEADER}🚀 Fetching posts for {username}...{Colors.ENDC}")
-    fetch_all_posts(username)
+    
+    scrape_user_data(username)
 
 if __name__ == "__main__":
     main()

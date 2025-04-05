@@ -1,31 +1,53 @@
-from firebase_database import  UserData
-# from aws_s3_storage import upload_to_s3
-from aws_s3_storage import upload_model_to_s3
-# import json
+import json, os
+from aws_s3_storage import upload_model_to_s3, upload_to_s3, download_file_from_s3
+from firebase_database import create_user, calc_avg_likes,avg_comments, UserData
 
-user_data = UserData(
-    username="elonmusk",
-    full_name="Elon Musk",
-    user_id="123456789",
-    biography="CEO of SpaceX and Tesla, Inc.",
-    fbid="1234567890",
-    fb_account_url="https://www.facebook.com/elonmusk",
-    json_url="https://s3.amazonaws.com/your-bucket/profiles/elonmusk.json",
-    post_json_url="https://s3.amazonaws.com/your-bucket/posts/elonmusk.json",
-    profile_pic_url="https://s3.amazonaws.com/your-bucket/profiles/elonmusk.jpg",
-    profile_pic_url_hd="https://s3.amazonaws.com/your-bucket/profiles/elonmusk_hd.jpg",
-    is_verified=True,
-    last_scraped="2025-04-04T15:00:00Z",
-    followers=231000000,
-    following=1,
-    posts_scraped=1342,
-    posts_count=3192,
-    avg_likes=1.3e6,
-    avg_comments=12_300
-)
+# user = data["data"]["user"]
+def upload_bulk_profiles(data):
+    user_data = UserData(
+        user_id=data["id"],
+        username=data["username"],
+        full_name=data["full_name"],
+        biography=data["biography"],
+        fbid=data["fbid"],
+        json_url="https://s3.amazonaws.com/viralyze/data/profiles/wth_ishu/profile.json",
+        post_json_url="https://s3.amazonaws.com/viralyze/data/profiles/wth_ishu/posts.json",
+        profile_pic_url=data["profile_pic_url"],
+        profile_pic_url_hd=data["profile_pic_url_hd"],
+        is_verified=data["is_verified"],
+        is_private=data["is_private"],
+        last_scraped='2023-10-01T12:00:00Z',
+        followers=data["edge_followed_by"]["count"],
+        following=data["edge_follow"]["count"],
+        posts_scraped=data["edge_owner_to_timeline_media"]["count"],
+        posts_count=data["edge_owner_to_timeline_media"]["count"],
+        avg_likes=calc_avg_likes(data["edge_owner_to_timeline_media"]["edges"]),
+        avg_comments=avg_comments(data["edge_owner_to_timeline_media"]["edges"]),
+    )
 
-# # create_user(user_data)
-# upload_to_s3("swiggyindia",file_type='profile')
-# upload_to_s3("swiggyindia",file_type='posts')
+    create_user(user_data)
+    
+def bulk_upload_profiles_posts_to_s3():
+    for profile in os.listdir("data/profiles/"):
+        file_path = f"data/profiles/{profile}/profile.json"
 
-upload_model_to_s3("likes_predictor")
+        with open(file_path, "r") as file:
+            data = json.load(file)
+        
+        # Assuming the JSON structure is as follows:
+        # upload_bulk_profiles(data)
+        print(f"Uploading {profile} to S3...")
+        upload_to_s3(profile, file_type='profile')
+        upload_to_s3(profile, file_type='posts')
+
+# upload_model_to_s3("likes_predictor")
+
+def upload_cache_file_to_s3():
+    cache_file_path = "data/fetch_cache.json"
+    if os.path.exists(cache_file_path):
+        upload_to_s3("cache", file_type='cache')
+    else:
+        print(f"Cache file {cache_file_path} does not exist.")
+
+# upload_cache_file_to_s3()
+# download_file_from_s3("fetch_cache.json", "fetch_cache.json")

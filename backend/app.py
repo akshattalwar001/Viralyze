@@ -6,11 +6,13 @@ from datetime import datetime
 from config import LOCAL_DATA_DIR, LOCAL_MODEL_DIR, LOCAL_PROFILE_DIR
 from predict_like import extract_features, predict_likes
 from utils import load_data
-from retrain_model import main as train_the_model, prepare_data, train_model
-
+from retrain_model import main as retrain_model, prepare_data, train_model
+from scraper import scrape_user_data, store_posts_into_json
 
 app = Flask(__name__)
 CORS(app)
+
+model, feature_names = None, None
 
 # Load the pre-trained model and feature names
 try:
@@ -20,15 +22,16 @@ try:
     # Check if the model file exists
     if not (LOCAL_MODEL_DIR / 'likes_predictor.joblib').exists():
         # raise FileNotFoundError("Model file not found. Please train the model first.")
-        train_the_model()
+        retrain_model()
     # Load the model and feature names from the joblib file
     model_data_path = LOCAL_MODEL_DIR / 'likes_predictor.joblib'
     model_data = joblib.load(model_data_path)
     model = model_data['model']
     feature_names = model_data['feature_names']
+    print("💫 Model and feature names loaded successfully.")
 except FileNotFoundError:
-    print("Error: 'likes_predictor.joblib' not found. Please train the model first.")
-    model, feature_names = None, None
+    print("Error: app.py 'likes_predictor.joblib' not found. Please train the model first.")
+
 
 # API endpoint for the API details
 @app.route('/', methods=['GET'])
@@ -57,6 +60,21 @@ def index():
                 'method': 'POST',
                 'endpoint': '/api/predict/likes',
                 'description': 'Predicts the number of likes based on hour and day.'
+            },
+            {
+                'method': 'POST',
+                'endpoint': '/api/retrain',
+                'description': 'Retrains the model with new data.'
+            },
+            {
+                'method': 'POST',
+                'endpoint': '/api/scrape/<username>',
+                'description': 'Scrapes user data from Instagram and saves it to a JSON file.'
+            },
+            {
+                'method': 'GET',
+                'endpoint': '/api/profile/<username>',
+                'description': 'Fetches profile data for a given username.'
             }
         ]
     }), 200
@@ -110,6 +128,8 @@ def predict():
 
 @app.route('/api/retrain', methods=['POST'])
 def retrain_model():
+    global model
+    global feature_names    
     try:
         # Load and prepare new data
         data = request.get_json()
@@ -128,8 +148,6 @@ def retrain_model():
             joblib.dump({'model': new_model, 'feature_names': feature_names}, model_path)
 
             # Update the global model and feature names
-            global model
-            global feature_names
             model = new_model
             feature_names = feature_names
 
@@ -141,7 +159,63 @@ def retrain_model():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/scrape/<username>', methods=['POST'])
+def scrape_user(username):
+    """
+    Scrape user data from Instagram and save it to a JSON file.
+    Expects a username in the URL path.
+    """
+    try:
+        # Assuming you have a function to scrape user data
+        posts = scrape_user_data(username)  # Implement this function in your scraper module
+        status = store_posts_into_json(posts, username)  # Implement this function to save posts to a JSON file
 
+        if not status:
+            return jsonify({'error': 'Failed to save posts.'}), 500
+        # Return success message
+        return jsonify({'message': f'Scraping data for {username} completed successfully.'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/profile/<username>', methods=['GET'])
+def get_profile(username):
+    """
+    Fetch profile data for a given username.
+    Expects a username in the URL path.
+    """
+    try:
+        # Load user data from the JSON file
+        user_data_path = LOCAL_PROFILE_DIR / f"{username}/profile.json"
+        data = load_data(user_data_path)
+
+        if not data:
+            return jsonify({'error': 'Profile data not found'}), 404
+
+        # Return profile data
+        return jsonify(data), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/predict/<username>/posts', methods=['POST'])
+def get_posts(username):
+    """
+    Fetch posts for a given username.
+    Expects a username in the URL path.
+    """
+    try:
+        # Load user data from the JSON file
+        posts_data_path = LOCAL_PROFILE_DIR / f"{username}/posts.json"
+        data = load_data(posts_data_path)
+
+        if not data:
+            return jsonify({'error': 'Posts data not found'}), 404
+
+        # Return posts data
+        return jsonify(data), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

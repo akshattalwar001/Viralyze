@@ -28,6 +28,7 @@ def extract_features(data):
     if not data:
         return pd.DataFrame()
     features = []
+    print("extracting features...")
     for post in data:
         dt = datetime.fromisoformat(post['timestamp'].replace('Z', '+00:00'))
 
@@ -97,6 +98,7 @@ def main():
         model, feature_names = train_model(X, y)
 
         if model:
+            LOCAL_MODEL_DIR.mkdir(parents=True, exist_ok=True)
             # Save the model and feature names (no scaler needed since we removed days_since_first_post)
             model_path = LOCAL_MODEL_DIR / 'likes_predictor.joblib'
             joblib.dump({'model': model, 'feature_names': feature_names}, model_path)

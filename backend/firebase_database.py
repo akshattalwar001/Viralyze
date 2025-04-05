@@ -29,12 +29,12 @@ class UserData:
     user_id: str
     biography: str
     fbid: str
-    fb_account_url: str
     json_url: str
     post_json_url: str
     profile_pic_url: str
     profile_pic_url_hd: str
     is_verified: bool
+    is_private: bool
     last_scraped: str
     followers: int
     following: int
@@ -52,6 +52,18 @@ def get_scraped_post_ids(username):
     if doc.exists:
         return set(doc.to_dict().get("scraped_post_ids", []))
     return set()
+
+def calc_avg_likes(posts):
+    total_likes = 0
+    for post in posts:
+        total_likes += post["node"]["edge_liked_by"]["count"]
+    return total_likes / len(posts) if posts else 0
+
+def avg_comments(posts):
+    total_comments = 0
+    for post in posts:
+        total_comments += post["node"]["edge_media_to_comment"]["count"]
+    return total_comments / len(posts) if posts else 0
 
 def update_scraped_post_ids(username, new_ids):
     doc_ref = db.collection("scrap_cache").document(username)
@@ -82,12 +94,12 @@ def create_user(user_data):
         "user_id": user_data.user_id,
         "biography": user_data.biography,
         "fbid": user_data.fbid,
-        "fb_account_url": user_data.fb_account_url,
         "json_url": user_data.json_url,
         "post_json_url": user_data.post_json_url,
         "profile_pic_url": user_data.profile_pic_url,
         "profile_pic_url_hd": user_data.profile_pic_url_hd,
         "is_verified": user_data.is_verified,
+        "is_private": user_data.is_private,
         "last_scraped": user_data.last_scraped,
         "followers": user_data.followers,
         "following": user_data.following,
@@ -96,3 +108,32 @@ def create_user(user_data):
         "avg_likes": user_data.avg_likes,
         "avg_comments": user_data.avg_comments
     })
+    
+    print(f"User {user_data.username} created in Firestore.")
+    return True
+
+def upload_posts_to_firestore(username, posts_file_path):
+    """
+    Uploads posts from a JSON file to the Firestore 'posts' collection.
+    Args:
+        username (str): The username associated with the posts.
+        posts_file_path (str): The path to the JSON file containing posts data.
+    """
+    try:
+        # Load posts from the JSON file
+        with open(posts_file_path, 'r', encoding='utf-8') as file:
+            posts = json.load(file)
+
+        # Upload each post to Firestore
+        for post in posts:
+            post_id = post["id"]
+            doc_ref = db.collection("posts").document(post_id)
+            doc_ref.set({
+                "username": username,
+                **post
+            })
+        print(f"Successfully uploaded posts for {username} to Firestore.")
+    except FileNotFoundError:
+        print(f"Error: File {posts_file_path} not found.")
+    except Exception as e:
+        print(f"Error uploading posts to Firestore: {e}")
