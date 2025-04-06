@@ -7,7 +7,7 @@ from pathlib import Path
 
 from config import LOCAL_DATA_DIR, LOCAL_MODEL_DIR, LOCAL_PROFILE_DIR
 from predict_like import extract_features, predict_likes
-from utils import load_data
+from utils import load_data, download_data_from_server
 from retrain_model import main as retrain_the_model, prepare_data, train_model
 from scraper import scrape_user_data, store_posts_into_json
 import hashlib
@@ -46,7 +46,7 @@ except FileNotFoundError:
 
 
 # API endpoint for the API details
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['GET']) # ⭐
 def index():
     current_time = datetime.now()
     protocol = request.scheme
@@ -120,7 +120,7 @@ def index():
     }), 200
 
 # API endpoint for stats
-@app.route('/api/stats', methods=['GET', 'POST'])
+@app.route('/api/stats', methods=['GET', 'POST']) # ⭐
 def get_stats():
     if request.method == 'POST':
         # Handle POST request to update the data
@@ -130,7 +130,7 @@ def get_stats():
         data = load_data(username_data_path)
     else:
         # Handle GET request to load the data
-        username_data_path = LOCAL_PROFILE_DIR / 'swiggyindia_posts.json'
+        username_data_path =  'swiggyindia_posts.json'
         data = load_data(username_data_path)
 
     if not data:
@@ -148,7 +148,7 @@ def get_stats():
     })
 
 # API endpoint for prediction (using only hour and day)
-@app.route('/api/predict/likes', methods=['POST'])
+@app.route('/api/predict/likes', methods=['POST']) # ⭐
 def predict():
     """
     Predict the number of likes based on hour and day of the week.
@@ -194,9 +194,10 @@ def retrain_model():
 
         if new_model:
             # Save the new model and feature names
+            LOCAL_MODEL_DIR.mkdir(parents=True, exist_ok=True)
             model_path = LOCAL_MODEL_DIR / 'likes_predictor.joblib'
             joblib.dump({'model': new_model, 'feature_names': feature_names}, model_path)
-
+            print(f"Model saved to {model_path}")
             # Update the global model and feature names
             model = new_model
             feature_names = feature_names
@@ -209,7 +210,7 @@ def retrain_model():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/scrape/<username>', methods=['POST'])
+@app.route('/api/scrape/<username>', methods=['POST']) # ⭐
 def scrape_user(username):
     """
     Scrape user data from Instagram and save it to a JSON file.
@@ -228,7 +229,7 @@ def scrape_user(username):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/profile/<username>', methods=['GET'])
+@app.route('/api/profile/<username>', methods=['GET']) # ⭐
 def get_profile(username):
     """
     Fetch profile data for a given username.
@@ -248,7 +249,7 @@ def get_profile(username):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/predict/<username>/posts', methods=['POST'])
+@app.route('/api/posts/<username>', methods=['GET']) # ⭐
 def get_posts(username):
     """
     Fetch posts for a given username.
@@ -267,7 +268,7 @@ def get_posts(username):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/download_data/<key>', methods=['POST'])
+@app.route('/api/download_data/<key>', methods=['POST']) # ⭐
 def download_data(key):
     """
     Download data from the server.

@@ -51,19 +51,23 @@ def extract_features(data):
 
 # Prepare data
 def prepare_data(df):
+    print("preparing data.....")
     if df.empty:
-        return pd.DataFrame(), pd.Series()
+        print("Error: No data available to prepare.")
+        return pd.DataFrame(), pd.Series(dtype='float64')  # Return an empty Series with a specified dtype
+    print("preparing dataframe...")
     # Encode day_of_week using one-hot encoding
     df = pd.get_dummies(df, columns=['day_of_week'], drop_first=True)
-
+    print("dataframe prepared!")
     # Separate features and target
     X = df.drop(columns=['likes_count'])
     y = df['likes_count']
-
+    print("data has been prepared!")
     return X, y
 
 # Train the model with tuned hyperparameters
 def train_model(X, y):
+    print("training data.....")
     if X.empty or y.empty:
         print("Error: No data available to train the model.")
         return None, None
@@ -94,17 +98,24 @@ def main():
         df = extract_features(data)
         X, y = prepare_data(df)
 
+        # Check if data is empty before proceeding
+        if X.empty or y.empty:
+            print("Error: No data available for training.")
+            return
+
         # Train the model
         model, feature_names = train_model(X, y)
 
         if model:
             LOCAL_MODEL_DIR.mkdir(parents=True, exist_ok=True)
-            # Save the model and feature names (no scaler needed since we removed days_since_first_post)
+            # Save the model and feature names
             model_path = LOCAL_MODEL_DIR / 'likes_predictor.joblib'
             joblib.dump({'model': model, 'feature_names': feature_names}, model_path)
             print(f"Model saved to {model_path}")
     except KeyboardInterrupt:
         print("\nProcess interrupted by user. Exiting...")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main()

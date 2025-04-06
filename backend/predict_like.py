@@ -33,6 +33,7 @@ def predict_likes(model, feature_names, hour, day_of_week):
 
 # Extract features from the dataset (for stats calculation)
 def extract_features(data):
+    print("extracting fetaures..................")
     if not data:
         return pd.DataFrame()
     features = []
@@ -94,6 +95,6 @@ def extract_features(data):
 
     # Engagement trend (likes over time)
     engagement_trend = df.groupby('timestamp')['likes_count'].mean().reset_index().to_dict('records')
-
+    print("extracted features.")
     return stats, best_time, best_day, top_post, engagement_trend
 
