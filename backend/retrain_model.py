@@ -46,7 +46,19 @@ def extract_features(data):
             'is_weekday': is_weekday,
             'likes_count': post['likes_count']
         })
-
+    print("features extracted!")
+    # Convert to DataFrame
+    
+    print("converting to dataframe...")
+    features = pd.DataFrame(features)
+    print("features converted!")
+    # Drop rows with NaN values
+    features.dropna(inplace=True)
+    # Ensure likes_count is numeric
+    features['likes_count'] = pd.to_numeric(features['likes_count'], errors='coerce')
+    features.dropna(subset=['likes_count'], inplace=True)  # Drop rows where likes_count is NaN
+    print(pd.DataFrame(features))
+    print("features ready!")
     return pd.DataFrame(features)
 
 # Prepare data
@@ -90,11 +102,43 @@ def train_model(X, y):
 
     return model, X_train.columns.tolist()
 
+def retrain_model(data):
+    """
+    Retrain the model with new data.
+    """
+    try:
+        # Extract features from the data
+        features = extract_features(data)
+        
+        # Ensure features is a DataFrame
+        if isinstance(features, tuple):
+            features = features[0]  # Assuming the first element is the DataFrame
+
+        # Debugging: Print the first few rows of the DataFrame
+        print("Extracted features:")
+        print(features.head())
+
+        # Prepare data for training
+        X, y = prepare_data(features)
+
+        # Train the model
+        new_model, feature_names = train_model(X, y)
+
+        # Save the new model and feature names
+        model_path = LOCAL_MODEL_DIR / 'likes_predictor.joblib'
+        joblib.dump({'model': new_model, 'feature_names': feature_names}, model_path)
+
+        print("Model retrained and saved successfully.")
+        return True
+    except Exception as e:
+        print(f"Error during retraining: {e}")
+        return False
+
 # Main execution
-def main():
+def main(post_data_file='swiggyindia_posts.json'):
     try:
         # Load and prepare data
-        data = load_data('swiggyindia_posts.json')
+        data = load_data(post_data_file)
         df = extract_features(data)
         X, y = prepare_data(df)
 
@@ -112,6 +156,7 @@ def main():
             model_path = LOCAL_MODEL_DIR / 'likes_predictor.joblib'
             joblib.dump({'model': model, 'feature_names': feature_names}, model_path)
             print(f"Model saved to {model_path}")
+            return  model, feature_names
     except KeyboardInterrupt:
         print("\nProcess interrupted by user. Exiting...")
     except Exception as e:

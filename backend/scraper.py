@@ -4,6 +4,12 @@ import os
 import time
 from datetime import datetime
 from random import choice, uniform
+from dotenv import load_dotenv
+from pathlib import Path
+from aws_s3_storage import upload_model_to_s3, upload_to_s3, download_file_from_s3
+# Load environment variables from .env file
+load_dotenv()
+
 
 # ANSI color codes for terminal output
 class Colors:
@@ -159,16 +165,131 @@ def store_posts_into_json(posts, username):
 
     return True if formatted_posts else False
 
+
+def store_posts_into_json(item, username):
+    """Process posts to extract relevant fields."""
+    formatted_posts = []
+    print(f"{Colors.OKCYAN}📦 Processing posts...{Colors.ENDC}")
+    
+    for post in item:
+        pid = post["id"]
+        shortcode = post["shortcode"]
+        taken_at = datetime.fromtimestamp(post["taken_at_timestamp"]).strftime('%Y-%m-%dT%H:%M:%SZ')
+        caption = post["caption"] if "caption" in post else ""
+        comments = post["comments_count"] if "comments_count" in post else 0
+        likes = post["likes_count"] if "likes_count" in post else 0
+        views = post["views_count"] if "views_count" in post else 0
+        hashtags = [word for word in caption.split() if word.startswith("#")]
+
+        formatted_post = {
+            "id": pid,
+            "shortcode": shortcode,
+            "likes_count": likes,
+            "comments_count": comments,
+            "timestamp": taken_at,
+            "caption": caption,
+            "hashtags": hashtags
+        }
+        formatted_posts.append(formatted_post)
+    
+    # Save the entire list of formatted posts
+    save_to_file(formatted_posts, os.path.join('data', 'profiles', username, 'posts.json'))
+
+    return True if formatted_posts else False
+
+
+def main():
+    username = "rvcjinsta"
+    
+    scrape_user_data(username)
+
+
+##### NEW SCRAPE FUNCTION ⭐⭐⭐
 def save_to_file(data, filename):
     """Save data to a JSON file."""
     with open(filename, "w") as file:
         json.dump(data, file, indent=4)
     print(f"{Colors.OKCYAN}💾 Data saved to {filename}{Colors.ENDC}")
 
-def main():
-    username = "rvcjinsta"
-    
-    scrape_user_data(username)
+
+def scrape_using_apify(username, max_posts=200):
+    """Scrape Instagram posts using Apify Actor."""
+    from apify_client import ApifyClient
+
+    # Initialize the ApifyClient with your API token
+    client = ApifyClient(os.getenv("APIFY_API_KEY"))
+
+    # Prepare the Actor input
+    run_input = {
+        "addParentData": False,
+        "directUrls": [f"https://www.instagram.com/{username}/"],
+        "resultsType": "details",
+        "resultsLimit": max_posts,
+        "enhanceUserSearchWithFacebookPage": False,
+        "isUserReelFeedURL": False,
+        "isUserTaggedFeedURL": False,
+        "searchLimit": 1,
+        "searchType": "hashtag"
+    }
+
+    # Run the Actor and wait for it to finish
+    run = client.actor("shu8hvrXbJbY3Eb9W").call(run_input=run_input)
+
+    # Fetch and process Actor results
+    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
+        # Extract profile data
+        profile_data = {
+            "inputUrl": item["inputUrl"],
+            "id": item["id"],
+            "username": item["username"],
+            "url": item["url"],
+            "fullName": item["fullName"],
+            "biography": item["biography"],
+            "externalUrls": item["externalUrls"],
+            "followersCount": item["followersCount"],
+            "followsCount": item["followsCount"],
+            "hasChannel": item["hasChannel"],
+            "highlightReelCount": item["highlightReelCount"],
+            "isBusinessAccount": item["isBusinessAccount"],
+            "joinedRecently": item["joinedRecently"],
+            "businessCategoryName": item["businessCategoryName"],
+            "private": item["private"],
+            "verified": item["verified"],
+            "profilePicUrl": item["profilePicUrl"],
+            "profilePicUrlHD": item["profilePicUrlHD"],
+            "igtvVideoCount": item["igtvVideoCount"],
+            "relatedProfiles": item["relatedProfiles"],
+            "latestIgtvVideos": item["latestIgtvVideos"],
+            "postsCount": item["postsCount"]
+        }
+
+        # Extract posts data
+        posts_data = []
+        for post in item.get("latestPosts", []):
+            posts_data.append({
+                "id": post["id"],
+                "shortcode": post["shortCode"],
+                "likes_count": post["likesCount"],
+                "comments_count": post["commentsCount"],
+                "timestamp": post["timestamp"],
+                "caption": post["caption"],
+                "hashtags": post["hashtags"],
+                "displayUrl": post["displayUrl"],
+            })
+
+        # Save profile and posts data
+        folder_path = os.path.join('data', 'profiles', username)
+        os.makedirs(folder_path, exist_ok=True)
+
+        save_to_file(profile_data, os.path.join(folder_path, 'profile.json'))
+        save_to_file(posts_data, os.path.join(folder_path, 'posts.json'))
+
+        # upload the files to aws s3
+        upload_to_s3(username, "profile")
+        upload_to_s3(username, "posts")
+
+    return True if item else False
+
 
 if __name__ == "__main__":
     main()

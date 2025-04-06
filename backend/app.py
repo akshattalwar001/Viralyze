@@ -102,8 +102,8 @@ def index():
                 'description': 'Fetches profile data for a given username.'
             },
             {
-                'method': 'POST',
-                'endpoint': '/api/predict/<username>/posts',
+                'method': 'GET',
+                'endpoint': '/api/posts/<username>',
                 'description': 'Fetches posts for a given username.',
                 'example_payload': {
                     "username": "<username>"
@@ -155,7 +155,7 @@ def predict():
     Expects a JSON payload with 'hour' (0-23) and 'day' (e.g., 'Monday').
     Returns the predicted number of likes.
     e.g. {
-        "hour": 12,
+        "hour": '12',
         "day": "Monday"
     }
     
@@ -185,12 +185,9 @@ def retrain_model():
         data = request.get_json()
         username = data['username']
         username_data_path = LOCAL_PROFILE_DIR / f"{username}/posts.json"
-        data = load_data(username_data_path)  # Assuming new data is fetched and saved in the same file
-        df = extract_features(data)
-        X, y = prepare_data(df)
+        print(f"Loading posts.json from: {username_data_path}")
 
-        # Train the model
-        new_model, feature_names = train_model(X, y)
+        new_model, feature_names = retrain_the_model(username_data_path)
 
         if new_model:
             # Save the new model and feature names
@@ -207,6 +204,7 @@ def retrain_model():
             return jsonify({'error': 'Model retraining failed.'}), 500
 
     except Exception as e:
+        print(f"Error during retraining: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -217,9 +215,12 @@ def scrape_user(username):
     Expects a username in the URL path.
     """
     try:
+        if os.path.exists(os.path.join(str(LOCAL_PROFILE_DIR), username, 'profile.json')) or os.path.exists(os.path.join(str(LOCAL_PROFILE_DIR), username, 'posts.json')):
+            return jsonify({'message': f'Scraping data for {username} exists .'}), 200
         # Assuming you have a function to scrape user data
-        posts = scrape_user_data(username)  # Implement this function in your scraper module
-        status = store_posts_into_json(posts, username)  # Implement this function to save posts to a JSON file
+        # posts = scrape_user_data(username)  # Implement this function in your scraper module
+        # status = store_posts_into_json(posts, username)  # Implement this function to save posts to a JSON file
+        # status = scrape_using_apify(username)
 
         if not status:
             return jsonify({'error': 'Failed to save posts.'}), 500

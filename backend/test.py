@@ -3,6 +3,7 @@ from utils import download_data_from_server
 from pathlib import Path
 from aws_s3_storage import upload_model_to_s3, upload_to_s3, download_file_from_s3
 from firebase_database import create_user, calc_avg_likes,avg_comments, UserData
+from scraper import scrape_using_apify
 
 # user = data["data"]["user"]
 def upload_bulk_profiles(data):
@@ -31,10 +32,11 @@ def upload_bulk_profiles(data):
     
 def bulk_upload_profiles_posts_to_s3():
     for profile in os.listdir("data/profiles/"):
-        file_path = f"data/profiles/{profile}/profile.json"
+        # profile = "swiggyindia"
+        file_path = f"data/profiles/{profile}/posts.json"
 
-        with open(file_path, "r") as file:
-            data = json.load(file)
+        # with open(file_path, "r") as file:
+        #     data = json.load(file)
         
         # Assuming the JSON structure is as follows:
         # upload_bulk_profiles(data)
@@ -53,5 +55,7 @@ def upload_cache_file_to_s3():
 
 # upload_cache_file_to_s3()
 # download_file_from_s3("fetch_cache.json", "fetch_cache.json")
+bulk_upload_profiles_posts_to_s3()
+# download_data_from_server()
 
-download_data_from_server()
+# scrape_using_apify("wth_ishu")
