@@ -1,4 +1,6 @@
 import json, os
+from utils import download_data_from_server
+from pathlib import Path
 from aws_s3_storage import upload_model_to_s3, upload_to_s3, download_file_from_s3
 from firebase_database import create_user, calc_avg_likes,avg_comments, UserData
 
@@ -51,3 +53,5 @@ def upload_cache_file_to_s3():
 
 # upload_cache_file_to_s3()
 # download_file_from_s3("fetch_cache.json", "fetch_cache.json")
+
+download_data_from_server()

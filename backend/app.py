@@ -1,18 +1,30 @@
 import joblib
+import logging
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from datetime import datetime
+from pathlib import Path
 
 from config import LOCAL_DATA_DIR, LOCAL_MODEL_DIR, LOCAL_PROFILE_DIR
 from predict_like import extract_features, predict_likes
 from utils import load_data
-from retrain_model import main as retrain_model, prepare_data, train_model
+from retrain_model import main as retrain_the_model, prepare_data, train_model
 from scraper import scrape_user_data, store_posts_into_json
+import hashlib
 
 app = Flask(__name__)
 CORS(app)
 
 model, feature_names = None, None
+
+# Configure logging for production
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s' )
+logger = logging.getLogger(__name__)
+# Update the Flask app to use production configurations
+if __name__ != '__main__':
+    app.config['ENV'] = 'production'
+    app.config['DEBUG'] = False
+    app.config['TESTING'] = False
 
 # Load the pre-trained model and feature names
 try:
@@ -22,7 +34,7 @@ try:
     # Check if the model file exists
     if not (LOCAL_MODEL_DIR / 'likes_predictor.joblib').exists():
         # raise FileNotFoundError("Model file not found. Please train the model first.")
-        retrain_model()
+        retrain_the_model()
     # Load the model and feature names from the joblib file
     model_data_path = LOCAL_MODEL_DIR / 'likes_predictor.joblib'
     model_data = joblib.load(model_data_path)
@@ -52,37 +64,75 @@ def index():
                 'description': 'Returns a list of available API methods and their functionality.'
             },
             {
-                'method': 'GET',
+                'method': 'GET, POST',
                 'endpoint': '/api/stats',
-                'description': 'Fetches statistics and engagement trends.'
+                'description': 'Fetches statistics and engagement trends.',
+                'example_payload': {
+                    "username": "<username>"
+                }
             },
             {
                 'method': 'POST',
                 'endpoint': '/api/predict/likes',
-                'description': 'Predicts the number of likes based on hour and day.'
+                'description': 'Predicts the number of likes based on hour and day.',
+                'example_payload': {
+                    "hour": 12,
+                    "day": "Monday"
+                }
             },
             {
                 'method': 'POST',
                 'endpoint': '/api/retrain',
-                'description': 'Retrains the model with new data.'
+                'description': 'Retrains the model with new data.',
+                'example_payload': {
+                    "username": "<username>"
+                }
             },
             {
                 'method': 'POST',
                 'endpoint': '/api/scrape/<username>',
-                'description': 'Scrapes user data from Instagram and saves it to a JSON file.'
+                'description': 'Scrapes user data from Instagram and saves it to a JSON file.',
+                'example_payload': {
+                    "username": "<username>"
+                }
             },
             {
                 'method': 'GET',
                 'endpoint': '/api/profile/<username>',
                 'description': 'Fetches profile data for a given username.'
+            },
+            {
+                'method': 'POST',
+                'endpoint': '/api/predict/<username>/posts',
+                'description': 'Fetches posts for a given username.',
+                'example_payload': {
+                    "username": "<username>"
+                }
+                
+            },
+            {
+                'method': 'POST',
+                'endpoint': '/api/download_data/<key>',
+                'description': 'Downloads data from the server.',
             }
+            
         ]
     }), 200
 
 # API endpoint for stats
-@app.route('/api/stats', methods=['GET'])
+@app.route('/api/stats', methods=['GET', 'POST'])
 def get_stats():
-    data = load_data()
+    if request.method == 'POST':
+        # Handle POST request to update the data
+        data = request.get_json()
+        username = data['username']
+        username_data_path = LOCAL_PROFILE_DIR / f"{username}/posts.json"
+        data = load_data(username_data_path)
+    else:
+        # Handle GET request to load the data
+        username_data_path = LOCAL_PROFILE_DIR / 'swiggyindia_posts.json'
+        data = load_data(username_data_path)
+
     if not data:
         return jsonify({'error': 'Data not found'}), 404
 
@@ -217,5 +267,29 @@ def get_posts(username):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/download_data/<key>', methods=['POST'])
+def download_data(key):
+    """
+    Download data from the server.
+    """
+    if key is not None:
+        # Hash the provided key and compare it with the stored hash
+        provided_hashed_key = hashlib.sha256(key.encode()).hexdigest()
+        if provided_hashed_key != 'b304a8f82c0e013c62e3103de303a1ed96e0398a3bb036381a8dd862eb241212':
+            return jsonify({'error': f'Invalid key: {key}'}), 403
+    try:
+        # Assuming you have a function to download data
+        # Implement this function in your utils module
+        status = download_data_from_server()
+
+        if not status:
+            return jsonify({'error': 'Failed to download data.'}), 500
+
+        # Return success message
+        return jsonify({'message': 'Data downloaded successfully.'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    logger.info("Starting the Flask app in production mode...")
+    app.run(host='0.0.0.0', port=5000)

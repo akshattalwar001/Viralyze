@@ -6,11 +6,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize AWS S3 client
+# Load AWS credentials and bucket name from environment variables
 aws_access_key = os.getenv('AWS_ACCESS_KEY')
 aws_secret_key = os.getenv('AWS_SECRET_KEY')
 bucket_name = os.getenv('BUCKET_NAME')
 
+if not aws_access_key or not aws_secret_key or not bucket_name:
+    raise EnvironmentError("AWS credentials or bucket name not set in environment variables.")
+
+# Initialize AWS S3 client
 s3 = boto3.client(
     's3',
     aws_access_key_id=aws_access_key,
@@ -99,6 +103,17 @@ def load_profile_data(username):
     except Exception as e:
         print("Error fetching from S3:", e)
         return None
+
+def fetch_folder_names_from_s3(prefix="profiles/"):
+    """Fetch all folder names from S3 bucket."""
+    # Fetch profile folder names from S3
+    try:
+        response = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix, Delimiter="/")
+        profile_folders = [prefix['Prefix'].split('/')[-2] for prefix in response.get('CommonPrefixes', [])]
+    except Exception as e:
+        print(f"Failed to fetch profile folders from S3: {e}")
+        return []
+    return profile_folders
 
 def download_file_from_s3(s3_key, local_path):
     """Download a file from S3 to a local path."""
