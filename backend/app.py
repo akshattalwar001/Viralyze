@@ -10,7 +10,7 @@ from config import LOCAL_DATA_DIR, LOCAL_MODEL_DIR, LOCAL_PROFILE_DIR
 from predict_like import extract_features, predict_likes
 from utils import load_data, download_data_from_server
 from retrain_model import main as retrain_the_model, prepare_data, train_model
-from scraper import scrape_user_data, store_posts_into_json
+from scraper import scrape_user_data, store_posts_into_json, scrape_using_apify
 import hashlib
 
 app = Flask(__name__)
@@ -221,12 +221,13 @@ def scrape_user(username):
         # Assuming you have a function to scrape user data
         # posts = scrape_user_data(username)  # Implement this function in your scraper module
         # status = store_posts_into_json(posts, username)  # Implement this function to save posts to a JSON file
-        # status = scrape_using_apify(username)
+        status, data_posts = scrape_using_apify(username)
 
         if not status:
             return jsonify({'error': 'Failed to save posts.'}), 500
         # Return success message
-        return jsonify({'message': f'Scraping data for {username} completed successfully.'}), 200
+        return jsonify({'message': f'Scraping data for {username} completed successfully.',
+        "posts":data_posts}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -288,7 +288,7 @@ def scrape_using_apify(username, max_posts=200):
         upload_to_s3(username, "profile")
         upload_to_s3(username, "posts")
 
-    return True if item else False
+    return True, posts_data if item else False
 
 
 if __name__ == "__main__":

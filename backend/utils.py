@@ -44,3 +44,6 @@ def download_data_from_server():
                 print(f"Downloaded {s3_key} to {local_path}.")
             except Exception as e:
                 print(f"Failed to download {s3_key}: {e}")
+                reurn False
+    print("All files downloaded successfully.")
+    return True
