@@ -21,6 +21,18 @@
 - [ ] Finish deployment
 
 
+![1](./images/2.jpg)
+
+![2](./images/4.jpg)
+
+![3](./images/5.jpg)
+
+![4](./images/6.jpg)
+
+![5](./images/7.jpg)
+
+![6](./images/8.jpg)
+
 ### User data model
 
 ```json
